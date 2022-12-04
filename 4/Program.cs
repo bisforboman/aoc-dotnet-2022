@@ -59,9 +59,36 @@ public static class Program
         Console.WriteLine("Part2 result: " + input.Count());
     }
 
+    private static UInt128 ToDiscreteValues3(string s)
+    {
+        (var a, var b) = s.TupleSplit('-');
+
+        var lower = int.Parse(a)-1;
+        var upper = int.Parse(b)-1;
+
+        UInt128 ret = 0;
+        for (var i = lower; i <= upper; i++)
+        {
+            ret += UInt128.One << i;
+        }
+
+        return ret;
+    }
+
+    private static void Part2_2(string inputPath)
+    {
+        var input = ReadAndParseInput(inputPath)
+            .Select(s => TupleSplit(s, ','))
+            .Select(tu => (ToDiscreteValues3(tu.Item1), ToDiscreteValues3(tu.Item2)))
+            .Where(tu => (tu.Item1 & tu.Item2) > 0);
+
+        Console.WriteLine("Part2_2 result: " + input.Count());
+    }
+
     public static void Main(string[] args)
     {
         Part1(args[0]);
         Part2(args[0]);
+        Part2_2(args[0]);
     }
 }
