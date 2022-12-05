@@ -4,13 +4,25 @@ public static class Program
 {    
     private static IEnumerable<string> ReadAndParseInput(string filePath) => 
         File.ReadAllLines(filePath);
+
+    private static char[][] ParseFirst(IEnumerable<string> ss)
+    {
+        
+    }
         
     private static void Part1(string inputPath)
     {
         var input = ReadAndParseInput(inputPath);
 
+        var first = input
+            .TakeWhile(e => !e.Trim().StartsWith("1"));
+        
+        var second = input
+            .SkipWhile(e => !e.Trim().StartsWith("1"))
+            .Skip(2);
+
         var result = input.Count();
-        Console.WriteLine("Part1 result: " + result);
+        Console.WriteLine("Part1 result: " + (first.Count(), second.Count()));
     }
 
 
