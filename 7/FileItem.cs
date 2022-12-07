@@ -1,6 +1,6 @@
 namespace CSharp;
 
-public class FileItem : IItem
+public class FileItem
 {
     public string Name { get; } = string.Empty;
     public long Size { get; }

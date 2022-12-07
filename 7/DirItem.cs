@@ -2,7 +2,7 @@ using System.Collections;
 
 namespace CSharp;
 
-public class DirItem : IItem, IEnumerable<DirItem>
+public class DirItem : IEnumerable<DirItem>
 {
     public string Name { get; } = string.Empty;
     private long Size { get; set; } = -1;
