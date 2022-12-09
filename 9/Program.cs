@@ -5,61 +5,54 @@ public static class Program3
     private static string[] ReadAndParseInput(string filePath) => 
         File.ReadAllLines(filePath);
 
-    private static (int, int) TranslateInstruction((string Direction, int Amount) Tuple) => Tuple.Direction switch
+    private static IEnumerable<(int, int)> TranslateInstruction((string Direction, int Amount) Tuple) => Tuple.Direction switch
     {
-        "R" => (Tuple.Amount, 0),
-        "L" => (-Tuple.Amount, 0),
-        "U" => (0, -Tuple.Amount),
-        "D" => (0, Tuple.Amount),
+        "R" => Enumerable.Repeat((1, 0), Tuple.Amount),
+        "L" => Enumerable.Repeat((-1, 0), Tuple.Amount),
+        "U" => Enumerable.Repeat((0, -1), Tuple.Amount),
+        "D" => Enumerable.Repeat((0, 1), Tuple.Amount),
         _ => throw new Exception("not good")
     };
 
-    private static IEnumerable<(int,int)> GetMovements((int X, int Y) delta, (int X, int Y) head)
+    private static (int, int) MoveToBecomeNeighbor(this (int X, int Y) a, (int X, int Y) b)
     {
-        // move down
-        for (int y = 1; y <= delta.Y; y++)
+        var xFar = Math.Abs(a.X - b.X) == 2;
+        var yFar = Math.Abs(a.Y - b.Y) == 2;
+        var updatedX = a.X + (b.X - a.X)/2;
+        var updatedY = a.Y + (b.Y - a.Y)/2;
+
+        if (xFar && yFar)
         {
-            yield return (head.X, head.Y + y);
+            return (updatedX, updatedY);
+        }
+        else if (xFar)
+        {
+            return (updatedX, b.Y);
+        }
+        else if (yFar)
+        {
+            return (b.X, updatedY);
         }
 
-        // move up
-        for (int y = -1; y >= delta.Y; y--)
-        {
-            yield return (head.X, head.Y + y);
-        }
-
-        // move right
-        for (int x = 1; x <= delta.X; x++)
-        {
-            yield return (head.X + x, head.Y);
-        }
-
-        // move left
-        for (int x = -1; x >= delta.X; x--)
-        {
-            yield return (head.X + x, head.Y);
-        }
+        return a;
     }
 
-    private static bool IsntTouching((int X, int Y) a, (int X, int Y) b) => Math.Abs(a.Y - b.Y) > 1 || Math.Abs(a.X - b.X) > 1;
-
-    private static ((int, int), (int, int)) Traverse(this int[,] board, (int X, int Y) delta, (int X, int Y) head, (int X, int Y) tail)
+    private static IEnumerable<(int, int)> GetTailCoordinates(IEnumerable<IEnumerable<(int, int)>> moves, (int X, int Y)[] rope)
     {
-        var movements = GetMovements(delta, head).ToArray();
-
-        for (int i = 0; i < movements.Length; i++)
+        foreach (var directions in moves)
         {
-            if (IsntTouching(movements[i], tail))
+            foreach ((var x, var y) in directions)
             {
-                tail = head;
+                rope[0].X += x;
+                rope[0].Y += y;
+                for (var i = 1; i < rope.Length; i++)
+                {
+                    rope[i] = rope[i].MoveToBecomeNeighbor(rope[i-1]);
+                }
+
+                yield return rope[^1];
             }
-
-            head = movements[i];
-
-            board[tail.X, tail.Y] = 1;
         }
-
-        return (head, tail);
     }
 
     private static (string,int) ToTuples(string s)
@@ -70,56 +63,30 @@ public static class Program3
 
     private static void Part1(string inputPath)
     {
-        var inputs = ReadAndParseInput(inputPath)
+        var moves = ReadAndParseInput(inputPath)
             .Select(ToTuples)
             .Select(TranslateInstruction);
 
-        var board = new int[1000,1000];
-        var head = (board.GetLength(0) / 2, board.GetLength(1) / 2);
-        var tail = head;
+        var rope = new (int, int)[] { (0,0), (0,0) };
 
-        foreach (var xy in inputs)
-        {
-            (head, tail) = board.Traverse(xy, head, tail);
-        }
+        var tailCoords = GetTailCoordinates(moves, rope).ToHashSet();
 
-        // for (var y = 0; y < board.GetLength(1); y++)
-        // {
-        //     for (var x = 0; x < board.GetLength(0); x++)
-        //     {
-        //         Console.Write($"({x},{y}) ");
-        //     }
-        //     Console.WriteLine();
-        // }
-
-        // Console.WriteLine("-- --");
-
-        // for (var y = 0; y < board.GetLength(1); y++)
-        // {
-        //     for (var x = 0; x < board.GetLength(0); x++)
-        //     {
-        //         Console.Write($"{(board[x, y] > 0 ? '#' : '.')}");
-        //     }
-        //     Console.WriteLine();
-        // }
-
-        var result = 0;
-        for (var y = 0; y < board.GetLength(1); y++)
-        {
-            for (var x = 0; x < board.GetLength(0); x++)
-            {
-                result += board[x,y];
-            }
-        }
+        var result = tailCoords.Count;
 
         Console.WriteLine("Part1 result: " + result);
     }
 
     private static void Part2(string inputPath)
     {
-        var inputs = ReadAndParseInput(inputPath);
+        var moves = ReadAndParseInput(inputPath)
+            .Select(ToTuples)
+            .Select(TranslateInstruction);
 
-        var result = "";
+        var rope = Enumerable.Repeat((0,0), 10).ToArray();
+
+        var tailCoords = GetTailCoordinates(moves, rope).ToHashSet();
+
+        var result = tailCoords.Count;
 
         Console.WriteLine("Part2 result: " + result);
     }
