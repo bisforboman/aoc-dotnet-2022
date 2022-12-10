@@ -76,8 +76,6 @@ public static class Program3
         var spritePositions = Accumulate(inputs)
             .ToDictionary(x => x.Key, x => x.Value);
 
-        Console.OutputEncoding = System.Text.Encoding.UTF8;
-
         for (var rows = 0; rows < 6; rows++)
         {
             for (var cycle = 1; cycle <= 40; cycle++)
