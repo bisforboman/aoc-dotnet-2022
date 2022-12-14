@@ -90,9 +90,6 @@ public static class Program
         }
     }
 
-    private static char ConvertIntToChar(this int i, int xMin) => 
-        Convert.ToChar(i - (xMin - 48 - 17));
-
     private static void PrintCoordinates(this IEnumerable<Coordinate> rocks, IEnumerable<Coordinate> sands)
     {
         var occupied = rocks.Concat(sands);
@@ -102,39 +99,15 @@ public static class Program
         var yMax = occupied.Max(p => p.Point.Y)+1;
         var DropPoint = new Coordinate((500,yMin)); 
 
-        Console.WriteLine($"x | {xMin} < {xMax} | {xMin.ConvertIntToChar(xMin)} = {xMin}");
-        Console.WriteLine($"y | {yMin} < {yMax}");
-        Console.WriteLine($"DropPoint is at {DropPoint}, ({DropPoint.Point.X} = {DropPoint.Point.X.ConvertIntToChar(xMin)})");
-
-        const int xPadding = 2;
-        string nothing = $"{".",xPadding}";
-        string rock = $"{"#",xPadding}";
-        string sand = $"{"o",xPadding}";
-        string drop = $"{"+",xPadding}";
+        string nothing = " ";
+        string rock = "\u2588";
+        string sand = "\u2591";
+        string drop = "+";
 
         for (int y = yMin; y <= yMax; y++)
         {
-            if (y == yMin)
+            for (int x = xMin; x <= xMax; x++)
             {
-                for (int x = xMin; x <= xMax; x++)
-                {
-                    if (x == xMin)
-                    {
-                        Console.Write($"{"",3}");
-                    }
-                    Console.Write($"{x.ConvertIntToChar(xMin),xPadding}");
-                }
-                Console.WriteLine();
-            }
-
-            for (int x = xMin-1; x <= xMax; x++)
-            {
-                if (x == xMin-1)
-                {
-                    Console.Write($"{y,3}");
-                    continue;
-                }
-
                 var coord = new Coordinate((x,y));
 
                 if (coord.Equals(DropPoint))
@@ -158,8 +131,9 @@ public static class Program
         }
     }
 
-    private static Coordinate? FindNextSpotForSand(this IDictionary<(int, int), Coordinate> occupied, int yMax)
+    private static Coordinate? FindNextSpotForSand(IDictionary<(int, int), Coordinate> rocks, IDictionary<(int, int), Coordinate> sands, int yMax)
     {
+        var occupied = rocks.Concat(sands).ToDictionary(x => x.Key);
         int x = 500, y = -1;
         while(y++ < yMax)
         {
@@ -188,22 +162,20 @@ public static class Program
         return null;
     }
 
-    private static IEnumerable<Coordinate> DropSand(this IDictionary<(int, int), Coordinate> rocks)
+    private static IDictionary<(int, int), Coordinate> DropSand(this IDictionary<(int, int), Coordinate> rocks)
     {
         var yMax = rocks.Values.Max(p => p.Point.Y);
-        var occupied = rocks;
-        var moreSands = new List<Coordinate>();
+        var moreSands = new Dictionary<(int, int), Coordinate>();
         while(true)
         {
-            var nextSand = occupied.FindNextSpotForSand(yMax);
+            var nextSand = FindNextSpotForSand(rocks, moreSands, yMax);
 
             if (nextSand is null)
             {
                 return moreSands;
             }
 
-            moreSands.Add(nextSand);
-            occupied.Add(nextSand.Point, nextSand);
+            moreSands.Add(nextSand.Point, nextSand);
 
             if (nextSand == new Coordinate((500, 0)))
             {
@@ -224,12 +196,12 @@ public static class Program
 
         var sands = rocks.DropSand();
 
-        var result = sands.Count();
+        var result = sands.Count;
 
         Console.WriteLine("Part1 result: " + result);
     }
 
-    private static Coordinate? FindNextSpotForSand2(this IDictionary<(int, int), Coordinate> occupied, int yMax)
+    private static Coordinate? FindNextSpotForSand2(IDictionary<(int, int), Coordinate> occupied, int yMax)
     {
         int x = 500, y = -1;
 
@@ -260,22 +232,22 @@ public static class Program
         return null;
     }
 
-    private static IEnumerable<Coordinate> FillWithSand(this IDictionary<(int,int), Coordinate> rocks)
+    private static IDictionary<(int, int), Coordinate> FillWithSand(this IDictionary<(int,int), Coordinate> rocks)
     {
         var yMax = rocks.Values.Max(p => p.Point.Y);
-        var occupied = rocks;
-        var moreSands = new List<Coordinate>();
+        var moreSands = new Dictionary<(int, int), Coordinate>();
+        var occupied = new Dictionary<(int, int), Coordinate>(rocks);
         while(true)
         {
-            var nextSand = occupied.FindNextSpotForSand2(yMax);
+            var nextSand = FindNextSpotForSand2(occupied, yMax);
 
             if (nextSand is null)
             {
                 return moreSands;
             }
 
-            moreSands.Add(nextSand);
             occupied.Add(nextSand.Point, nextSand);
+            moreSands.Add(nextSand.Point, nextSand);
 
             if (nextSand == new Coordinate((500, 0)))
             {
@@ -307,7 +279,9 @@ public static class Program
 
         var sands = rocksWithFloor.FillWithSand();
 
-        var result = sands.Count();
+        PrintCoordinates(rocksWithFloor.Values, sands.Values);
+
+        var result = sands.Count;
 
         Console.WriteLine("Part2 result: " + result);
     }
