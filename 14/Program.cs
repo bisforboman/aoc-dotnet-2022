@@ -2,8 +2,33 @@ namespace CSharp;
 
 public static class Program
 {
-    private record Coordinate((int X, int Y) Point);
-    private record Line(Coordinate Start, Coordinate End);
+    private record Coordinate((int X, int Y) Point)
+    {
+        public Coordinate Down => new((Point.X, Point.Y+1));
+        public Coordinate Left => new((Point.X-1, Point.Y));
+        public Coordinate Right => new((Point.X+1, Point.Y));
+
+        public override string ToString() => Point.ToString();
+    };
+    private record Line(Coordinate Start, Coordinate End)
+    {
+        public bool MovesInX => Start.Point.X != End.Point.X;
+        public bool MovesInY => Start.Point.Y != End.Point.Y;
+        public bool GrowsFromStart()
+        {
+            if (MovesInX)
+            {
+                return Start.Point.X < End.Point.X;
+            }
+
+            if (MovesInY)
+            {
+                return Start.Point.Y < End.Point.Y;
+            }
+
+            throw new Exception("not good! - GrowsFromStart");
+        }
+    };
 
     private static string[] ReadAndParseInput(string filePath) => 
         File.ReadAllLines(filePath);
@@ -22,74 +47,82 @@ public static class Program
 
         foreach (var (Start, End) in zipped)
         {
-            yield return new(Start, End);
+            yield return new Line(Start, End);
         }
     }
 
-    private static (int, int) GetXCoords(IEnumerable<Line> linesOfRock)
+    private static IEnumerable<Coordinate> ToCoordinates(this Line line)
     {
-        var xMax_Start = linesOfRock.Max(l => l.Start.Point.X);
-        var xMax_End = linesOfRock.Max(l => l.End.Point.X);
+        int xStart = line.Start.Point.X, 
+            xEnd = line.End.Point.X, 
+            yStart = line.Start.Point.Y, 
+            yEnd = line.End.Point.Y;
 
-        var xMax = xMax_Start > xMax_End 
-            ? xMax_Start 
-            : xMax_End;
-
-        var xMin_Start = linesOfRock.Min(l => l.Start.Point.X);
-        var xMin_End = linesOfRock.Min(l => l.End.Point.X);
-
-        var xMin = xMin_Start < xMin_End 
-            ? xMin_Start
-            : xMin_End;
-
-        return (xMin, xMax);
-    }
-
-    private static (int, int) GetYCoords(IEnumerable<Line> linesOfRock)
-    {
-        var yMax_Start = linesOfRock.Max(l => l.Start.Point.Y);
-        var yMax_End = linesOfRock.Max(l => l.End.Point.Y);
-
-        var yMax = yMax_Start > yMax_End 
-            ? yMax_Start 
-            : yMax_End;
-
-        var yMin_Start = linesOfRock.Min(l => l.Start.Point.Y);
-        var yMin_End = linesOfRock.Min(l => l.End.Point.Y);
-
-        var yMin = yMin_Start < yMin_End 
-            ? yMin_Start
-            : yMin_End;
-
-        return (yMin, yMax);
-    }
-
-    private static void Part1(string inputPath)
-    {
-        var input = ReadAndParseInput(inputPath);
-
-        var linesOfRock = input.SelectMany(LinesOfRock);
-
-        foreach (var l in linesOfRock)
+        if (!line.GrowsFromStart())
         {
-            Console.WriteLine(l);
+            if (line.MovesInX)
+            {
+                xStart = line.End.Point.X;
+                xEnd = line.Start.Point.X;
+            }
+
+            if (line.MovesInY)
+            {
+                yStart = line.End.Point.Y;
+                yEnd = line.Start.Point.Y;
+            }
         }
 
-        (var xMin, var xMax) = GetXCoords(linesOfRock);
-        (var yMin, var yMax) = GetYCoords(linesOfRock);
+        if (line.MovesInX)
+        {
+            for (int x = xStart; x <= xEnd; x++)
+            {
+                yield return new((x,line.Start.Point.Y));
+            }
+        }
+        
+        if (line.MovesInY)
+        {
+            for (int y = yStart; y <= yEnd; y++)
+            {
+                yield return new((line.Start.Point.X, y));
+            }
+        }
+    }
+
+    private static char ConvertIntToChar(this int i, int xMin) => 
+        Convert.ToChar(i - (xMin - 48 - 17));
+
+    private static void PrintCoordinates(this IEnumerable<Coordinate> rocks, IEnumerable<Coordinate> sands)
+    {
+        var occupied = rocks.Concat(sands);
+        var xMin = occupied.Min(p => p.Point.X)-1;
+        var xMax = occupied.Max(p => p.Point.X)+1;
+        var yMin = occupied.Min(p => p.Point.Y)-1;
+        var yMax = occupied.Max(p => p.Point.Y)+1;
+        var DropPoint = new Coordinate((500,yMin)); 
+
+        Console.WriteLine($"x | {xMin} < {xMax} | {xMin.ConvertIntToChar(xMin)} = {xMin}");
+        Console.WriteLine($"y | {yMin} < {yMax}");
+        Console.WriteLine($"DropPoint is at {DropPoint}, ({DropPoint.Point.X} = {DropPoint.Point.X.ConvertIntToChar(xMin)})");
+
+        const int xPadding = 2;
+        string nothing = $"{".",xPadding}";
+        string rock = $"{"#",xPadding}";
+        string sand = $"{"o",xPadding}";
+        string drop = $"{"+",xPadding}";
 
         for (int y = yMin; y <= yMax; y++)
         {
-            // write header
             if (y == yMin)
             {
                 for (int x = xMin; x <= xMax; x++)
                 {
                     if (x == xMin)
                     {
-                        Console.Write("    ");
+                        Console.Write($"{"",3}");
                     }
-                    Console.Write($"{x,4}");
+                    Console.Write($"{x.ConvertIntToChar(xMin),xPadding}");
                 }
                 Console.WriteLine();
             }
@@ -98,25 +131,183 @@ public static class Program
             {
                 if (x == xMin-1)
                 {
-                    Console.Write($"{y,4}");
+                    Console.Write($"{y,3}");
                     continue;
                 }
-                Console.Write("  . ");
+
+                var coord = new Coordinate((x,y));
+
+                if (coord.Equals(DropPoint))
+                {
+                    Console.Write(drop);
+                }
+                else if (rocks.Contains(coord))
+                {
+                    Console.Write(rock);
+                }
+                else if (sands.Contains(coord))
+                {
+                    Console.Write(sand);
+                }
+                else
+                {
+                    Console.Write(nothing);
+                }
             }
             Console.WriteLine();
         }
+    }
 
-        var result = "";
+    private static Coordinate? FindNextSpotForSand(this IDictionary<(int, int), Coordinate> occupied, int yMax)
+    {
+        int x = 500, y = -1;
+        while(y++ < yMax)
+        {
+            var current = new Coordinate((x,y));
+
+            if (!occupied.ContainsKey(current.Down.Point))
+            {
+                continue;
+            }
+
+            if (!occupied.ContainsKey(current.Down.Left.Point))
+            {
+                x--;
+                continue;
+            }
+
+            if (!occupied.ContainsKey(current.Down.Right.Point))
+            {
+                x++;
+                continue;
+            }
+
+            return current;
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Coordinate> DropSand(this IDictionary<(int, int), Coordinate> rocks)
+    {
+        var yMax = rocks.Values.Max(p => p.Point.Y);
+        var occupied = rocks;
+        var moreSands = new List<Coordinate>();
+        while(true)
+        {
+            var nextSand = occupied.FindNextSpotForSand(yMax);
+
+            if (nextSand is null)
+            {
+                return moreSands;
+            }
+
+            moreSands.Add(nextSand);
+            occupied.Add(nextSand.Point, nextSand);
+
+            if (nextSand == new Coordinate((500, 0)))
+            {
+                return moreSands;
+            }
+        }
+    }
+
+    private static void Part1(string inputPath)
+    {
+        var input = ReadAndParseInput(inputPath);
+
+        var rocks = input
+            .SelectMany(LinesOfRock)
+            .SelectMany(ToCoordinates)
+            .ToHashSet()
+            .ToDictionary(x => x.Point);
+
+        var sands = rocks.DropSand();
+
+        var result = sands.Count();
 
         Console.WriteLine("Part1 result: " + result);
     }
 
+    private static Coordinate? FindNextSpotForSand2(this IDictionary<(int, int), Coordinate> occupied, int yMax)
+    {
+        int x = 500, y = -1;
+
+        while(y++ < yMax)
+        {
+            var current = new Coordinate((x,y));
+
+            if (!occupied.ContainsKey(current.Down.Point))
+            {
+                continue;
+            }
+
+            if (!occupied.ContainsKey(current.Down.Left.Point))
+            {
+                x--;
+                continue;
+            }
+
+            if (!occupied.ContainsKey(current.Down.Right.Point))
+            {
+                x++;
+                continue;
+            }
+
+            return current;
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<Coordinate> FillWithSand(this IDictionary<(int,int), Coordinate> rocks)
+    {
+        var yMax = rocks.Values.Max(p => p.Point.Y);
+        var occupied = rocks;
+        var moreSands = new List<Coordinate>();
+        while(true)
+        {
+            var nextSand = occupied.FindNextSpotForSand2(yMax);
+
+            if (nextSand is null)
+            {
+                return moreSands;
+            }
+
+            moreSands.Add(nextSand);
+            occupied.Add(nextSand.Point, nextSand);
+
+            if (nextSand == new Coordinate((500, 0)))
+            {
+                return moreSands;
+            }
+        }
+
+    }
+
     private static void Part2(string inputPath)
     {
-        var input = ReadAndParseInput(inputPath)
+        var input = ReadAndParseInput(inputPath);
+
+        var rocks = input
+            .SelectMany(LinesOfRock)
+            .SelectMany(ToCoordinates)
             ;
 
-        var result = "";
+        var y = rocks.Max(p => p.Point.Y)+2;
+        var xMin = 500 - y;
+        var xMax = 500 + y;
+
+        var floor = new Line(new Coordinate((xMin, y)), new Coordinate((xMax, y)));
+
+        var rocksWithFloor = rocks
+            .Concat(floor.ToCoordinates())
+            .ToHashSet()
+            .ToDictionary(x => x.Point);
+
+        var sands = rocksWithFloor.FillWithSand();
+
+        var result = sands.Count();
 
         Console.WriteLine("Part2 result: " + result);
     }
