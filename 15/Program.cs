@@ -5,9 +5,10 @@ public static class Program
     private record Coordinate(int X, int Y)
     {
         public (int, int) ToTuple => (X,Y);
-        public int DistanceTo((int X, int Y) other) => 
-            Math.Abs(X - other.X) + Math.Abs(Y - other.Y);
+        public static Coordinate Create((int x,int y) p) => new(p.x,p.y);
+        public int DistanceTo((int X, int Y) other) => Math.Abs(X - other.X) + Math.Abs(Y - other.Y);
         public int DistanceTo(Coordinate other) => DistanceTo(other.ToTuple);
+        public long TuningFrequency => ((long)X) * 4000000 + Y;
     };
 
     private static string[] ReadAndParseInput(string filePath) => 
@@ -29,61 +30,57 @@ public static class Program
         return (new(sensorX, sensorY), new(beaconX, beaconY));
     }
 
-    private static void Print(HashSet<Coordinate> sensors, HashSet<Coordinate> beacons, (int,int)[] covers)
+    private static void Print(IEnumerable<(Coordinate, Coordinate)> coordinates, HashSet<Coordinate> covers, (int Min, int Max) xs, (int Min, int Max) ys)
     {
-        var coordinates = sensors.Concat(beacons);
+        var yMin = ys.Min;
+        var yMax = ys.Max;
+        var xMin = xs.Min;
+        var xMax = xs.Max;
 
-        // var yMin = coordinates.Min(p => p.Y);
-        // var yMax = coordinates.Max(p => p.Y);
+        var sensors = coordinates.Select(e => e.Item1).ToHashSet();
+        var beacons = coordinates.Select(e => e.Item2).ToHashSet();
 
-        // var xMin = coordinates.Min(p => p.X);
-        // var xMax = coordinates.Max(p => p.X);
-        (var xMin, var xMax) = (-10, 20);
-        (var yMin, var yMax) = (-5, 20);
-
-        for (int y = yMin; y <= yMax; y++)
+        for (int y = yMin-1; y <= yMax; y++)
         {
             for (int x = xMin; x <= xMax; x++)
             {
                 var current = new Coordinate(x,y);
                 if (sensors.Contains(current))
                 {
-                    Console.Write('S');
+                    Console.Write("S");
                 }
                 else if (beacons.Contains(current))
                 {
-                    Console.Write('B');
+                    Console.Write("B");
                 }
-                else if(covers.Contains((x,y)))
+                else if(covers.Contains(current))
                 {
-                    Console.Write('#');
+                    Console.Write("#");
                 }
                 else
                 {
-                    Console.Write('.');
+                    Console.Write(".");
                 }
             }
             Console.WriteLine();
         }
     }
 
-    private static IEnumerable<(int, int)> Covers(KeyValuePair<(int, int), Coordinate> kv)
+    private static IEnumerable<Coordinate> Covers(KeyValuePair<(int, int), Coordinate> kv, (int Start, int End) search)
     {
-        var d = kv.Value.DistanceTo(kv.Key);
+        var sensorCoord = Coordinate.Create(kv.Key);
 
-        (var xStart, var yStart) = kv.Key;
+        var d = kv.Value.DistanceTo(sensorCoord);
 
-        // Console.WriteLine($"Starting from {kv.Key} | Distance: {d} | y: {yStart-d}-{yStart+d} | x: {xStart-d}-{xStart+d}");
+        (var xStart, var yStart) = search;
 
-        for (int y = yStart-2*d; y <= yStart+d; y++)
+        for (int y = yStart-d; y <= yStart+d; y++)
         {
-            for (int x = xStart-2*d; x <= xStart+d; x++)
+            for (int x = xStart-d; x <= xStart+d; x++)
             {
-                // Console.Write($" {kv.Value.DistanceTo((x,y)),2} ");
-                if (kv.Value.DistanceTo((x,y)) <= d)
+                if (sensorCoord.DistanceTo((x,y)) <= d)
                 {
-                    // Console.Write((x,y));
-                    yield return (x,y);
+                    yield return new Coordinate(x,y);
                 }
             }
         }
@@ -106,28 +103,127 @@ public static class Program
             .Select(c => c.Item2)
             .ToHashSet();
 
-        // foreach (var kv in closestBeaconCoordinates)
-        // {
-        //     Console.WriteLine($"Distance to beacon at {kv.Key}: {kv.Value.DistanceTo(kv.Key)}");
-        // }
+        var y = 10;
+        var covered = new HashSet<Coordinate>();
 
-        var covers = Covers(closestBeaconCoordinates.First()).ToArray();
+        foreach (var b in closestBeaconCoordinates)
+        {
+            foreach (var c in Covers(b, b.Key))
+            {
+                if (!beacons.Contains(c))
+                { 
+                    covered.Add(c);
+                }
+            }
+        }
 
-        // Print(sensors, beacons, covers);
+        var xMin = covered.Min(p => p.X);
+        var xMax = covered.Max(p => p.X);
 
-        var result = "";
+        var contained = new HashSet<Coordinate>();
+
+        for (int x = xMin; x <= xMax; x++)
+        {
+            var coord = new Coordinate(x,y);
+            if (covered.Contains(coord))
+            {
+                contained.Add(coord);
+            }
+        }
+
+        var result = contained.Count;
 
         Console.WriteLine("Part1 result: " + result);
     }
 
     private static void Part2(string inputPath)
     {
-        var input = ReadAndParseInput(inputPath)
-            ;
+        var input = ReadAndParseInput(inputPath);
 
-        var result = "";
+        var coordinates = input.Select(ToCoordinates);
+
+        var sensors = coordinates
+            .Select(c => c.Item1)
+            .ToHashSet();
+        
+        var beacons = coordinates
+            .Select(c => c.Item2)
+            .ToHashSet();
+
+        var circles = coordinates
+            .Select(c => (Coord: c.Item1, Distance: c.Item1.DistanceTo(c.Item2)))
+            .ToArray();
+
+        int min = 0, max = 4000000;
+
+        var map = new HashSet<Coordinate>();
+        for (int i = 0; i < circles.Length; i++)
+        {
+            var c = circles[i];
+
+            for (int j = i+1; j < circles.Length; j++)
+            {                
+                var d = circles[j];
+
+                if (c.Coord.DistanceTo(d.Coord) == c.Distance + d.Distance + 2)
+                {
+                    int yMax = Math.Min(c.Coord.Y + c.Distance, d.Coord.Y + d.Distance);
+                    int yMin = Math.Max(c.Coord.Y - c.Distance, d.Coord.Y - d.Distance);
+                    
+                    int xMin = Math.Max(c.Coord.X - c.Distance, d.Coord.X - d.Distance);
+                    int xMax = Math.Min(c.Coord.X + c.Distance, d.Coord.X + d.Distance);
+                    
+                    for (int y = yMin; y < yMax; y++)
+                    {
+                        int xa = c.Coord.X + (c.Distance + 1 - Math.Abs(y - c.Coord.Y));                    
+                        if (min <= xa && xa <= max && xMin <= xa && xa <= xMax)
+                        {
+                            map.Add(new Coordinate(xa, y));
+                        }
+
+                        int xb = c.Coord.X - (c.Distance + 1 - Math.Abs(y - c.Coord.Y));
+                        if (min <= xb && xb <= max && xMin <= xb && xb <= xMax)
+                        {
+                            map.Add(new Coordinate(xb, y));
+                        }
+                    }
+                }
+            }
+        }
+        
+        var coord = FindCoord(sensors, beacons, circles, map);
+
+        var result = coord.TuningFrequency;
 
         Console.WriteLine("Part2 result: " + result);
+    }
+
+    private static Coordinate FindCoord(HashSet<Coordinate> sensors, HashSet<Coordinate> beacons, (Coordinate, int)[] circles, HashSet<Coordinate> map)
+    {
+        foreach (var point in map)
+        {
+            if (sensors.Contains(point) || beacons.Contains(point))
+            {
+                continue;
+            }
+
+            bool found = true;
+            foreach (var c in circles)
+            {
+                if (point.DistanceTo(c.Item1) <= c.Item2)
+                {
+                    found = false;
+                    break;
+                }
+            }
+
+            if (found)
+            {
+                return point;
+            }
+        }
+
+        throw new Exception("nope");
     }
 
     public static void Main(string[] args)
