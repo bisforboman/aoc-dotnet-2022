@@ -12,20 +12,49 @@ public static class Program
 
     private static Comparer<Valve> Comparer = Comparer<Valve>.Create((a, b) => b.Rate - a.Rate);
 
-    private static void ShortestPaths(this Dictionary<Valve, Valve[]> dict, Dictionary<Valve, IEnumerable<Valve>> paths, Valve from)
+    // fill each dict-entry with allnodes
+    private static (Dictionary<Valve, Valve[]>, IEnumerable<Valve>) ShortestPaths(
+        Dictionary<Valve, Valve[]> pathToNode, 
+        Dictionary<Valve, IEnumerable<Valve>> neighborsDict,
+        HashSet<Valve> border,
+        HashSet<Valve> visisted)
     {
-        var newSteps = new List<Valve>();
 
-        foreach (var v in paths[from].Where(p => !dict.ContainsKey(p)))
+        if (!border.Any())
         {
-            newSteps.Add(v);
+            return (pathToNode, Enumerable.Empty<Valve>());
         }
 
-        foreach (var v in newSteps.Where(p => !dict.ContainsKey(p)))
+        var nextPossibleSteps = new List<(Valve,Valve)>();
+        foreach (var nn in border)
         {
-            dict.Add(v, dict[from].Append(v).ToArray());
-            dict.ShortestPaths(paths, v);
+            var excludeVisited = neighborsDict[nn]
+                .Where(b => !visisted.Contains(b))
+                .Select(b => (nn,b));
+
+            nextPossibleSteps.AddRange(excludeVisited);
         }
+
+        foreach ((var start, var dest) in nextPossibleSteps)
+        {
+            var toReachStep = pathToNode[start].Append(dest).ToArray();
+            if (toReachStep.Length < pathToNode[dest].Length)
+            {
+                pathToNode[dest] = toReachStep;
+            }
+        }
+
+        foreach ((var start, var dest) in nextPossibleSteps)
+        {
+            ShortestPaths(pathToNode, neighborsDict, border, visisted.Append(dest).ToHashSet());
+        }
+
+
+
+        // foreach ((var v, var path) in list)
+        // {
+        //     dict.ShortestPaths(paths, v);
+        // }
     }
 
     private static void Print(this Dictionary<Valve, Valve[]> paths, Valve from)
@@ -47,9 +76,6 @@ public static class Program
 
         return (new Valve(c[0], int.Parse(c[1])), c[2].Split(", "));
     }
-
-    private static int GetRate(int time, KeyValuePair<Valve, Valve[]> v, Dictionary<string, int> rates) => 
-        (time - v.Value.Length - 1) * rates[v.Key.Name];
 
     private static List<Valve[]> AllOrderings(Valve[] valvesToVisit, Valve[] visited)
     {
@@ -91,11 +117,13 @@ public static class Program
         var pathsDict = valvesAndPaths
             .ToDictionary(v => v.Item1, v => v.Item2.Select(v2 => new Valve(v2, valvesDict[v2])));
 
-        var from = new Valve("AA", 0);
+        var fromValve = new Valve("AA", 0);
 
         var bestWayFromEachPoint = new Dictionary<Valve, Dictionary<Valve, Valve[]>>();
         
-        foreach (var v in pathsDict.Keys)
+        var bb = new Valve("BB", 13);
+
+        foreach (var v in pathsDict.Keys.Skip(1).Take(1))
         {
             var dict = new Dictionary<Valve, Valve[]>
             {
@@ -110,15 +138,63 @@ public static class Program
             .Where(p => p.Rate > 0)
             .ToArray();
 
-        var allOrders = AllOrderings(valvesToVisit, Array.Empty<Valve>());
+        // var visited = new Valve[] { fromValve };
+        // var allOrders = AllOrderings(valvesToVisit, visited)
+        //     .ToArray();
 
-        foreach (var o in allOrders)
+        foreach (var b in bestWayFromEachPoint)
         {
-            for (int time = 30; time > 29; time--)
+            foreach (var p in b.Value)
             {
-                
+                Console.WriteLine($"{p.Key} - {string.Join(",", p.Value.AsEnumerable())}");
             }
         }
+
+        // var allOrders = new Valve[1][]
+        // {
+        //     new Valve[] 
+        //     {
+        //         new Valve("AA", 0),
+        //         new Valve("DD", 20),
+        //         new Valve("BB", 13),
+        //         new Valve("JJ", 21),
+        //         new Valve("HH", 22),
+        //         new Valve("EE", 3),
+        //         new Valve("CC", 2),
+        //     }
+        // };
+
+        // var list = new List<(int, Valve[])>();
+        // foreach (var o in allOrders)
+        // {
+        //     var openValveAt = new List<(int, Valve)>();
+        //     var time = 30;
+        //     for (int v = 0; v < o.Length - 1 ; v++)
+        //     {
+        //         var current = o[v];
+        //         var next = o[v+1];
+        //         var steps = bestWayFromEachPoint[current][next];
+
+        //         time -= steps.Length;
+        //         time--;
+
+        //         Console.WriteLine($"Going from {current} to {next} takes {steps.Length} (Path: {string.Join(",", steps.AsEnumerable())})");
+        //         Console.WriteLine($"Time's at {(30 - time)}. Rate {next.Rate}. Total {time} * {next.Rate} = {time*next.Rate}");
+        //         Console.WriteLine();
+
+        //         openValveAt.Add((time, next));
+        //     }
+
+        //     var valvesOrder = openValveAt.Select(v => v.Item2).ToArray();
+        //     var rates = openValveAt.Sum(v => v.Item2.Rate * v.Item1);
+
+        //     list.Add((rates, valvesOrder));
+        // }
+
+        // foreach ((var rate, var path) in list.OrderByDescending(o => o.Item1).Take(1))
+        // {
+        //     Console.WriteLine($"Rate {rate} | {string.Join(",", path.AsEnumerable())}");
+        // }
 
         var result = "";
 
